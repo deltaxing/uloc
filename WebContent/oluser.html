@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+		<link rel="stylesheet" href="css/ol.css" />
+		<script type="text/javascript" src="js/ol.js"></script>
+		<script src="js/jquery-3.3.1.js"></script>
+		<script type="text/javascript" src="js/layer/layer.js"></script>
+		<style>
+			body {
+				padding: 0;
+				margin: 0;
+			}
+			
+			html,
+			body {
+				height: 100%;
+				width: 100vw;
+				/*height: 400px;
+        width: 100%;*/
+			}
+			
+			#map {
+				width: 97vw;
+				height: 92vh;
+			}
+			.nav {
+			    width:100%;
+			    height:30px;
+			    margin:0 auto;
+			    background:#f00;
+			    position:fixed;
+			    bottom:0;
+			    text-align:center;
+			}			
+		</style>
+
+	</head>
+
+	<body>
+		<!--<h2>My Map</h2>-->
+		<div id="map" class="map"></div>
+		<div class="nav" onclick="saveLoc();">记住这个位置</div>		
+	</body>
+		<script>
+function getQueryVariable(variable) {
+	var query = window.location.search.substring(1);
+	var vars = query.split("&");
+	for(var i = 0; i < vars.length; i++) {
+		var pair = vars[i].split("=");
+		if(pair[0] == variable) {
+			return pair[1];
+		}
+	}
+	return(false);
+}
+
+function saveLoc(){
+	setCookie('target_loc',getQueryVariable("LocID"),30);
+	
+	//alert("save this location!" + getCookie("target_loc"));
+	//document.location.reload();
+	//window.location.href = window.location.href + "&xing=1"
+	window.location.replace(window.location.href + "&xing=1");
+	
+	
+}
+	</script>
+	<script type="text/javascript">
+function getCookie(c_name)
+{
+if (document.cookie.length>0)
+  {
+  c_start=document.cookie.indexOf(c_name + "=")
+  if (c_start!=-1)
+    { 
+    c_start=c_start + c_name.length+1 
+    c_end=document.cookie.indexOf(";",c_start)
+    if (c_end==-1) c_end=document.cookie.length
+    return unescape(document.cookie.substring(c_start,c_end))
+    } 
+  }
+return ""
+}
+
+function setCookie(c_name,value,expiredays)
+{
+var exdate=new Date()
+exdate.setDate(exdate.getDate()+expiredays)
+document.cookie=c_name+ "=" +escape(value)+
+((expiredays==null) ? "" : ";expires="+exdate.toGMTString())
+}
+
+function checkCookie()
+{
+username=getCookie('username')
+if (username!=null && username!="")
+  {alert('Welcome again '+username+'!')}
+else 
+  {
+  username=prompt('Please enter your name:',"")
+  if (username!=null && username!="")
+    {
+    setCookie('username',username,365)
+    }
+  }
+}
+	</script>
+
+	
+	<script type="text/javascript">
+		// 示意图 相关
+		//var extent = [0, 0, 534, 428];   // 示意图的左下角，和 右上角
+		var extent = [0, 0, 2000, 2588];
+		var projection = new ol.proj.Projection({
+			//code: 'xkcd-image',
+			units: 'pixels',
+			extent: extent
+		});
+
+		//图标相关
+		// 但前位置图标
+		var iconFeature_currentLoc = new ol.Feature({
+	        geometry: new ol.geom.Point([0,0])
+		});
+		var iconStyle_currentLoc = new ol.style.Style({
+			image: new ol.style.Icon( /** @type {olx.style.IconOptions} */ ({
+				anchor: [0.5, 0.5],
+				anchorXUnits: 'fraction',
+				anchorYUnits: 'fraction',  //pixels
+				
+				rotateWithView: true,  
+				src: 'img/arrowhead_up_small.png'
+				//src: 'https://openlayers.org/en/v4.6.4/examples/data/icon.png'
+			}))
+		});
+		iconFeature_currentLoc.setStyle(iconStyle_currentLoc);
+		//停车位图标
+		var iconFeature_carLoc = new ol.Feature({
+	        geometry: new ol.geom.Point([0,0])
+		});
+		var iconStyle_carLoc = new ol.style.Style({
+			image: new ol.style.Icon( /** @type {olx.style.IconOptions} */ ({
+				anchor: [0.5, 1],
+				anchorXUnits: 'fraction',
+				anchorYUnits: 'fraction',  //pixels
+				
+				//rotateWithView: true,  
+				src: 'img/car60.png'
+				//src: 'https://openlayers.org/en/v4.6.4/examples/data/icon.png'
+			}))
+		});
+		iconFeature_carLoc.setStyle(iconStyle_carLoc);
+		//
+		var vectorSource = new ol.source.Vector({
+			//features: [iconFeature]       
+		});
+		var vectorLayer = new ol.layer.Vector({
+			source: vectorSource
+		});
+
+		
+		// map对象
+		var map = new ol.Map({
+			layers: [
+				new ol.layer.Image({
+					source: new ol.source.ImageStatic({
+						attributions: '© <a href="http://xkcd.com/license.html">xkcd</a>',
+						//url: 'https://imgs.xkcd.com/comics/online_communities.png',
+						url: 'img/coors-parking_2000.jpg',
+						projection: projection,
+						imageExtent: extent
+					})
+				}),
+				vectorLayer      // 图标所在的层
+			],
+			target: 'map',
+			view: new ol.View({
+				projection: projection,
+				center: ol.extent.getCenter(extent),
+				//center: [100, 228],
+				extent: extent,
+				zoom: 1,
+				maxZoom: 8
+			})
+		});
+		
+		// 
+		iconStyle_currentLoc.getImage().setRotation(Math.PI/2);  //设置当前位置 手机朝向
+
+
+		//map.getView().setRotation(Math.PI / 2);   //地图  整体旋转
+		//alert(ol.extent.getBottomLeft(extent));
+
+		//尝试 点击 获取坐标
+		map.on('click',function(event){
+			console.log(event.coordinate);
+
+		})
+		
+		//获取当前位置 坐标
+		$.post("/uloc/GetLocation",{LocID: getQueryVariable("LocID")},function(result){
+			var Coordinate = JSON.parse(result).Coordinate.split(",");
+			iconFeature_currentLoc.getGeometry().setCoordinates(Coordinate);
+			vectorSource.addFeature(iconFeature_currentLoc);  // 添加Feature  当前位置
+		});
+		//获取车位 坐标
+		$.post("/uloc/GetLocation",{LocID: getCookie("target_loc")},function(result){
+			var Coordinate = JSON.parse(result).Coordinate.split(",");
+			iconFeature_carLoc.getGeometry().setCoordinates(Coordinate);
+			vectorSource.addFeature(iconFeature_carLoc);   // 添加Feature  停车位置
+		});		
+
+
+		//marker 暂时未用到
+		var styles = {
+			'route': new ol.style.Style({
+				stroke: new ol.style.Stroke({
+					width: 6,
+					color: [237, 212, 0, 0.8]
+				})
+			}),
+			'icon': new ol.style.Style({
+				image: new ol.style.Icon({
+					anchor: [0.5, 1],
+					src: 'https://openlayers.org/en/v4.6.4/examples/data/icon.png'
+				})
+			}),
+			'geoMarker': new ol.style.Style({
+				image: new ol.style.Circle({
+					radius: 7,
+					snapToPixel: false,
+					fill: new ol.style.Fill({
+						color: 'black'
+					}),
+					stroke: new ol.style.Stroke({
+						color: 'white',
+						width: 2
+					})
+				})
+			})
+		};
+	</script>
+
+</html>

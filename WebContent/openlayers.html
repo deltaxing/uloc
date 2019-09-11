@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+		<link rel="stylesheet" href="css/ol.css" />
+		<script type="text/javascript" src="js/ol.js"></script>
+		<script src="js/jquery-3.3.1.js"></script>
+		<script type="text/javascript" src="js/layer/layer.js"></script>
+		<style>
+			body {
+				padding: 0;
+				margin: 0;
+			}
+			
+			html,
+			body {
+				height: 100%;
+				width: 100vw;
+				/*height: 400px;
+        width: 100%;*/
+			}
+			
+			#map {
+				width: 97vw;
+				height: 92vh;
+			}
+		</style>
+
+	</head>
+
+	<body>
+		<!--<h2>My Map</h2>-->
+		<div id="map" class="map"></div>
+		<button onclick="downloadQrCodes()">下载所有位置二维码</button>
+
+	</body>
+	<script type="text/javascript">
+		// 示意图 相关
+		//var extent = [0, 0, 534, 428];   // 示意图的左下角，和 右上角
+		var extent = [0, 0, 2000, 2588];
+		var projection = new ol.proj.Projection({
+			//code: 'xkcd-image',
+			units: 'pixels',
+			extent: extent
+		});
+
+		//图标相关
+		// 但前位置图标
+		var iconFeature_currentLoc = new ol.Feature({
+	        geometry: new ol.geom.Point([500,500])
+		});
+		var iconStyle_currentLoc = new ol.style.Style({
+			image: new ol.style.Icon( /** @type {olx.style.IconOptions} */ ({
+				anchor: [0.5, 0.5],
+				anchorXUnits: 'fraction',
+				anchorYUnits: 'fraction',  //pixels
+				
+				rotateWithView: true,  
+				src: 'img/arrowhead_up_small.png'
+				//src: 'https://openlayers.org/en/v4.6.4/examples/data/icon.png'
+			}))
+		});
+		iconFeature_currentLoc.setStyle(iconStyle_currentLoc);
+		//停车位图标
+		var iconFeature_carLoc = new ol.Feature({
+	        geometry: new ol.geom.Point([1000,1000])
+		});
+		var iconStyle_carLoc = new ol.style.Style({
+			image: new ol.style.Icon( /** @type {olx.style.IconOptions} */ ({
+				anchor: [0.5, 1],
+				anchorXUnits: 'fraction',
+				anchorYUnits: 'fraction',  //pixels
+				
+				//rotateWithView: true,  
+				src: 'img/car60.png'
+				//src: 'https://openlayers.org/en/v4.6.4/examples/data/icon.png'
+			}))
+		});
+		iconFeature_carLoc.setStyle(iconStyle_carLoc);
+		//
+		var vectorSource = new ol.source.Vector({
+			//features: [iconFeature]       
+		});
+		var vectorLayer = new ol.layer.Vector({
+			source: vectorSource
+		});
+
+		
+		// map对象
+		var map = new ol.Map({
+			layers: [
+				new ol.layer.Image({
+					source: new ol.source.ImageStatic({
+						attributions: '© <a href="http://xkcd.com/license.html">xkcd</a>',
+						//url: 'https://imgs.xkcd.com/comics/online_communities.png',
+						url: 'img/coors-parking_2000.jpg',
+						projection: projection,
+						imageExtent: extent
+					})
+				}),
+				vectorLayer      // 图标所在的层
+			],
+			target: 'map',
+			view: new ol.View({
+				projection: projection,
+				center: ol.extent.getCenter(extent),
+				//center: [100, 228],
+				extent: extent,
+				zoom: 1,
+				maxZoom: 8
+			})
+		});
+		
+		// 
+		iconStyle_currentLoc.getImage().setRotation(Math.PI/2);  //设置当前位置 手机朝向
+		vectorSource.addFeature(iconFeature_currentLoc);  // 添加Feature  当前位置
+		vectorSource.addFeature(iconFeature_carLoc);   // 添加Feature  停车位置
+		//map.getView().setRotation(Math.PI / 2);   //地图  整体旋转
+		//alert(ol.extent.getBottomLeft(extent));
+
+		//尝试 点击 获取坐标
+		map.on('click',function(event){
+			console.log(event.coordinate);
+			//iconFeature_carLoc.setGeometry(new ol.geom.Point(event.coordinate));
+			
+			layer.prompt(function(val, index){
+				  layer.msg('得到了'+val);
+				  layer.close(index);
+				  
+				  $.post("/uloc/AddLocation",{LocName: val, Coordinate: event.coordinate.join(',')},function(result){
+				  	//alert(result);
+						var feature_marked = new ol.Feature({
+					        geometry: new ol.geom.Point(event.coordinate)
+						});	
+						feature_marked.setStyle(new ol.style.Style({
+				            image: new ol.style.Circle({
+				                radius: 8,
+				                fill: new ol.style.Fill({color: 'green'}),
+				                stroke: new ol.style.Stroke({color: 'red', width: 1})
+				            })
+				       	}));
+						vectorSource.addFeature(feature_marked);
+				  });
+				});
+		})
+		
+		//绘制已标记的位置
+		var ShowPositions = function(){
+			$.post("/uloc/GetAllLocations",{},function(result){
+				var res = JSON.parse(result);
+				
+				for(var i =0; i < res.length; i++){
+					cols = res[i].Coordinate.split(',');
+					if(cols.length == 1)
+						continue;
+					var feature_marked = new ol.Feature({
+				        geometry: new ol.geom.Point([parseFloat(cols[0]), parseFloat(cols[1])])
+					});	
+					feature_marked.setStyle(new ol.style.Style({
+			            image: new ol.style.Circle({
+			                radius: 8,
+			                fill: new ol.style.Fill({color: 'green'}),
+			                stroke: new ol.style.Stroke({color: 'red', width: 1})
+			            })
+			       	}));
+					vectorSource.addFeature(feature_marked);
+				}
+			});
+		}
+		ShowPositions();
+		
+		//下载二维码
+		var downloadQrCodes = function(){
+			window.location.href = "/uloc/GetAllQrCodes";
+		};
+
+		//marker 暂时未用到
+		var styles = {
+			'route': new ol.style.Style({
+				stroke: new ol.style.Stroke({
+					width: 6,
+					color: [237, 212, 0, 0.8]
+				})
+			}),
+			'icon': new ol.style.Style({
+				image: new ol.style.Icon({
+					anchor: [0.5, 1],
+					src: 'https://openlayers.org/en/v4.6.4/examples/data/icon.png'
+				})
+			}),
+			'geoMarker': new ol.style.Style({
+				image: new ol.style.Circle({
+					radius: 7,
+					snapToPixel: false,
+					fill: new ol.style.Fill({
+						color: 'black'
+					}),
+					stroke: new ol.style.Stroke({
+						color: 'white',
+						width: 2
+					})
+				})
+			})
+		};
+	</script>
+
+</html>
